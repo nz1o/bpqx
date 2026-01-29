@@ -66,7 +66,7 @@ Items can be selected by typing the shortcut key (e.g., `C`) or the full text (e
 
 ### IO Prompts
 
-When a menu item with an `io` block is selected, the user is prompted for input:
+When a menu item with an `io` block is selected, the user is prompted for input sequentially — one prompt at a time, ordered by `id`. Each prompt collects its own inputs before moving to the next.
 
 ```
 Enter a call sign: W1AW
@@ -77,7 +77,7 @@ Enter a call sign: W1AW
 | `H` or `Help` | Display help for this IO prompt |
 | Any other input | Validated against expected inputs, then used to execute the command |
 
-Input values are space-separated. The number and types of values must match the `inputs` definition. Command stdout is printed to the user. Command stderr is suppressed.
+Input values are space-separated. The number and types of values must match the prompt's `inputs` definition. If an input has `required: true`, a blank response is rejected. If all inputs for a prompt are optional, a blank response is accepted. Command stdout is printed to the user. Command stderr is suppressed.
 
 ## Application Settings
 
@@ -138,10 +138,18 @@ Each menu item must have exactly one of `io` or `menu` (not both).
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `prompt` | string | Conditional | Prompt displayed to the user. Required if `inputs` is specified. |
-| `inputs` | list | No | List of expected input parameters. If omitted, the command runs with no user input. |
-| `help` | string | No | Help text shown when user types H at the IO prompt. |
+| `prompts` | list | No | List of prompt objects presented to the user sequentially, ordered by `id`. If omitted, the command runs with no user input. |
+| `help` | string | No | Help text shown when user types H at any IO prompt. |
 | `command` | string | Yes | Shell command to execute. May contain `{id}` or `{name}` placeholders. |
+
+### Prompt Object
+
+Each entry in the `prompts` list defines a single prompt displayed to the user.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `prompt` | string | Yes | Text displayed to the user when requesting input. |
+| `inputs` | list | No | List of expected input parameters for this prompt. |
 
 ### Input Object
 
@@ -149,6 +157,7 @@ Each menu item must have exactly one of `io` or `menu` (not both).
 |---|---|---|---|
 | `id` | int | Yes | Position of this input (starting at 1). Also used as `{id}` placeholder in command. |
 | `type` | string | Yes | Expected type: `string`, `int`, or `bool`. |
+| `required` | bool | No | If `true`, the user must provide a non-empty value. Defaults to `false`. |
 | `name` | string | No | Named placeholder. If set, `{name}` can be used in the command string. |
 
 ### Placeholder Substitution
@@ -162,12 +171,12 @@ Commands can reference inputs by position or name:
 ### Example Extension
 
 ```yaml
-name: RPBOOK
-description: 'Query an offline copy of RepeaterBook.com data'
+name: FCCDB
+description: 'Query an offline copy of the FCC amateur radio license database'
 about: >-
-  This is an emergency backup in case the site is unavailable.
+  This is an offline version of the FCC amateur radio license database.
 help: >-
-  Help text goes here
+  Search the FCC DB by call sign and get license history by FRN and USI
 program:
   start_msg: ''
   menu:
@@ -178,12 +187,14 @@ program:
         text: Call
         help: Search by call sign
         io:
-          prompt: 'Enter a call sign'
-          inputs:
-            - id: 1
-              type: string
-              name: _callsign
-          command: 'curl -s http://localhost:8010/api/query/callastext?call_sign={_callsign}'
+          prompts:
+            - prompt: 'Enter a call sign'
+              inputs:
+                - id: 1
+                  type: string
+                  required: true
+                  name: _callsign
+          command: 'curl http://localhost:8010/api/query/callastext?call_sign={_callsign}'
           help: Enter a call sign to search for
       - id: 2
         key: V

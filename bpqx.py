@@ -23,23 +23,38 @@ def load_appsettings():
 
 def validate_io(io_obj, filepath, path):
     errors = []
+    if isinstance(io_obj, list):
+        if len(io_obj) == 0:
+            errors.append(f"{filepath}: {path}.io must not be empty")
+            return errors
+        io_obj = io_obj[0]
     if not isinstance(io_obj, dict):
         errors.append(f"{filepath}: {path}.io must be a mapping")
         return errors
     if "command" not in io_obj:
         errors.append(f"{filepath}: {path}.io.command is required")
-    inputs = io_obj.get("inputs")
-    if inputs:
-        if "prompt" not in io_obj:
-            errors.append(f"{filepath}: {path}.io.prompt is required when inputs are specified")
-        if not isinstance(inputs, list):
-            errors.append(f"{filepath}: {path}.io.inputs must be a list")
+    prompts = io_obj.get("prompts")
+    if prompts:
+        if not isinstance(prompts, list):
+            errors.append(f"{filepath}: {path}.io.prompts must be a list")
         else:
-            for inp in inputs:
-                if "id" not in inp:
-                    errors.append(f"{filepath}: {path}.io.inputs[].id is required")
-                if "type" not in inp:
-                    errors.append(f"{filepath}: {path}.io.inputs[].type is required")
+            for j, p in enumerate(prompts):
+                p_path = f"{path}.io.prompts[{j}]"
+                if not isinstance(p, dict):
+                    errors.append(f"{filepath}: {p_path} must be a mapping")
+                    continue
+                if "prompt" not in p:
+                    errors.append(f"{filepath}: {p_path}.prompt is required")
+                inputs = p.get("inputs")
+                if inputs:
+                    if not isinstance(inputs, list):
+                        errors.append(f"{filepath}: {p_path}.inputs must be a list")
+                    else:
+                        for inp in inputs:
+                            if "id" not in inp:
+                                errors.append(f"{filepath}: {p_path}.inputs[].id is required")
+                            if "type" not in inp:
+                                errors.append(f"{filepath}: {p_path}.inputs[].type is required")
     return errors
 
 
@@ -135,29 +150,44 @@ def find_item_by_text(items, text):
 
 
 def run_io(io_obj):
-    inputs_def = io_obj.get("inputs", []) or []
-    while True:
-        if io_obj.get("prompt"):
-            user_input = input(f"{io_obj['prompt']}: ").strip()
-        elif inputs_def:
-            user_input = input(": ").strip()
-        else:
-            user_input = None
+    prompts = io_obj.get("prompts") or []
+    collected = {}
 
-        if user_input is not None:
+    for prompt_def in sorted(prompts, key=lambda p: p.get("id", 0)):
+        inputs_def = prompt_def.get("inputs", []) or []
+        inputs_sorted = sorted(inputs_def, key=lambda x: x["id"]) if inputs_def else []
+
+        while True:
+            user_input = input(f"{prompt_def['prompt']}: ").strip()
+
             if user_input.lower() in ("h", "help"):
                 print(io_obj.get("help", "No help available."))
                 continue
 
-        if not inputs_def:
-            command = io_obj["command"]
-        else:
+            if not inputs_sorted:
+                break
+
             values = user_input.split() if user_input else []
-            if len(values) != len(inputs_def):
-                print(f"Error: expected {len(inputs_def)} input(s), got {len(values)}")
+            if len(values) != len(inputs_sorted):
+                if not values:
+                    has_required = any(inp.get("required") for inp in inputs_sorted)
+                    if not has_required:
+                        for inp in inputs_sorted:
+                            collected[inp["id"]] = ""
+                            if inp.get("name"):
+                                collected[inp["name"]] = ""
+                        break
+                    print("Error: input is required")
+                else:
+                    print(f"Error: expected {len(inputs_sorted)} input(s), got {len(values)}")
                 continue
+
             valid = True
-            for inp, val in zip(sorted(inputs_def, key=lambda x: x["id"]), values):
+            for inp, val in zip(inputs_sorted, values):
+                if inp.get("required") and not val:
+                    print(f"Error: input {inp['id']} is required")
+                    valid = False
+                    continue
                 t = inp["type"].lower()
                 if t == "int":
                     try:
@@ -172,24 +202,27 @@ def run_io(io_obj):
             if not valid:
                 continue
 
-            command = io_obj["command"]
-            for inp, val in zip(sorted(inputs_def, key=lambda x: x["id"]), values):
-                command = command.replace(f"{{{inp['id']}}}", val)
+            for inp, val in zip(inputs_sorted, values):
+                collected[inp["id"]] = val
                 if inp.get("name"):
-                    command = command.replace(f"{{{inp['name']}}}", val)
+                    collected[inp["name"]] = val
+            break
 
-        unknown = re.findall(r"\{[^}]+\}", command)
-        if unknown:
-            print(f"Error: unknown placeholder(s) in command: {', '.join(unknown)}")
-            return
+    command = io_obj["command"]
+    for key, val in collected.items():
+        command = command.replace(f"{{{key}}}", val)
 
-        try:
-            result = subprocess.run(command, shell=True, capture_output=True, text=True)
-            if result.stdout:
-                print(result.stdout, end="")
-        except Exception as e:
-            print(f"Error running command: {e}")
+    unknown = re.findall(r"\{[^}]+\}", command)
+    if unknown:
+        print(f"Error: unknown placeholder(s) in command: {', '.join(unknown)}")
         return
+
+    try:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if result.stdout:
+            print(result.stdout, end="")
+    except Exception as e:
+        print(f"Error running command: {e}")
 
 
 def display_menu(menu):
@@ -268,7 +301,10 @@ def run_extension(ext):
         if "menu" in item:
             menu_stack.append(item["menu"])
         elif "io" in item:
-            run_io(item["io"])
+            io_obj = item["io"]
+            if isinstance(io_obj, list):
+                io_obj = io_obj[0]
+            run_io(io_obj)
 
 
 def main():

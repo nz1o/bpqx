@@ -1,15 +1,13 @@
 # The following key/text combinations are reserved: A/About, B/Back, H/Help, X/Exit
 
-name: RPBOOK  # Single word name of the BPQX extension that will be used to call the extension from BPQX
-description: 'Query an offline copy of RepeaterBook.com data for ME, NH, and MA' # Description of the extension
+name: FCCDB  # Single word name of the BPQX extension that will be used to call the extension from BPQX
+description: 'Query an offline copy of the FCC amateur radio license database' # Description of the extension
 about: >- # Main 'About' information for the extension.  This should describe the overall function/purpose of the extension
-  This is an emergency backup in case the site is unavailable, not a replacement.
-
-  All data belongs to RepeaterBook.com
+  This is an offline version of the FCC amateur radio license database.  Data is pulled weekly and is available completely offline
 
   2026 - John Moran (NZ1O)
 help: >- # Main 'Help' information for the extension that will be displayed when the user calls Help from the root of the extension
-  Help text goes here
+  Search the FCC DB by call sign and get license history by FRN and USI
 program:  # Start of the extension's program
     start_msg: ''  # Initial message that will be displayed to the user on startup 
     # Menu items consist of a prompt that will be displayed to the user and a list of menu options available for the user to choose from
@@ -23,15 +21,17 @@ program:  # Start of the extension's program
     #         - io: <or> menu: # Each menu item must have one of, but not both of, io: or menu:
     #             menu: 
     #               <sub menu in the same menu format>
-    #             io:
-    #               prompt: string    # Prompt that will be displayed to the user to input data (Required if inputs are specified)
-    #               inputs:           # List of inputs that are expected (Optional)
-    #                 - id: int       # Order the input will be entered, starting with 1 (Required if inputs are specified)
-    #                   type: string  # Type of input expected.  Ex: "string", "int", "bool" (Required if inputs are specified)
-    #                   name: string  # Name of the input parameter (Optional)
-    #               help: string      # Help text for the specific menu item
-    #               command: string   # Command to be executed.  To pass input parameters use {id} or {name} placeholders.
-    #                                 # Ex: "ls -al {1}" or "wget -O {filename} {url}"
+    #             io:                   
+    #               prompts:               # List of prompts to be displayed to the user (Required if inputs are specified)
+    #                 - prompt: string     # Prompt that will be displayed to the user to input data 
+    #                   inputs:            # List of inputs that are expected (Optional)
+    #                     - id: int        # Order the input will be entered, starting with 1 (Required if inputs are specified)
+    #                       type: string   # Type of input expected.  Ex: "string", "int", "bool" (Required if inputs are specified)
+    #                       required: bool # Is the input required?
+    #                       name: string   # Name of the input parameter (Optional)
+    #               help: string           # Help text for the specific menu item
+    #               command: string        # Command to be executed.  To pass input parameters use {id} or {name} placeholders.
+    #                                      # Ex: "ls -al {1}" or "wget -O {filename} {url}"
     #
     # Important!  Each branch of the menu tree must end with an "io" statement, resulting in a command being run
 
@@ -43,11 +43,13 @@ program:  # Start of the extension's program
           text: Call
           help: Search by call sign
           io:
-            prompt: 'Enter a call sign'
-            inputs:
-              - id: 1
-                type: string
-                name: _callsign
+            prompts:
+              - prompt: 'Enter a call sign'
+                inputs:
+                  - id: 1
+                    type: string
+                    required: true
+                    name: _callsign
             command: 'curl http://localhost:8010/api/query/callastext?call_sign={_callsign}'
             help: Enter a call sign to search for
         - id: 2
@@ -62,11 +64,13 @@ program:  # Start of the extension's program
                 text: FRN
                 help: Get history by FRN number
                 io:
-                  prompt: Enter FRN number
-                  inputs:
-                    - id: 1
-                      type: string
-                      name: _frn
+                  prompts:
+                    - prompt: Enter FRN number
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: _frn
                   command: 'curl http://localhost:8010/api/query/historyastext/frn?frn={_frn}'
                   help: Enter USI number for USI history
               - id: 2
@@ -74,11 +78,13 @@ program:  # Start of the extension's program
                 text: USI
                 help: Get history by USI number
                 io:
-                  prompt: Enter USI number
-                  inputs:
-                    - id: 1
-                      type: string
-                      name: _usi
+                  prompts:
+                    - prompt: Enter USI number
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: _usi
                   command: 'curl http://localhost:8010/api/query/historyastext/usi?usi={_usi}'
                   help: Enter USI number for USI history
         - id: 3
@@ -86,7 +92,7 @@ program:  # Start of the extension's program
           text: Version
           help: Get date of the most recent data pull
           io:
-            command: 'curl http://localhost:8010/api/versionastext'
-            help: Get date of the most recent data pull
+            - command: 'curl http://localhost:8010/api/versionastext'
+              help: Get date of the most recent data pull
 
 version: 0.1.0
