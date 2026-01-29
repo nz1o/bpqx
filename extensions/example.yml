@@ -67,7 +67,7 @@ program:  # Start of the extension's program
                     - id: 1
                       type: string
                       name: _frn
-                  command: 'curl http://localhost:8010/api/query/history/frn?frn={_frn}'
+                  command: 'curl http://localhost:8010/api/query/historyastext/frn?frn={_frn}'
                   help: Enter USI number for USI history
               - id: 2
                 key: U
@@ -79,14 +79,14 @@ program:  # Start of the extension's program
                     - id: 1
                       type: string
                       name: _usi
-                  command: 'curl http://localhost:8010/api/query/history/usi?usi={_usi}'
+                  command: 'curl http://localhost:8010/api/query/historyastext/usi?usi={_usi}'
                   help: Enter USI number for USI history
         - id: 3
           key: V
           text: Version
           help: Get date of the most recent data pull
           io:
-            command: 'curl http://localhost:8010/api/version'
+            command: 'curl http://localhost:8010/api/versionastext'
             help: Get date of the most recent data pull
 
 version: 0.1.0

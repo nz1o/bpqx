@@ -281,6 +281,8 @@ def main():
 
     while True:
         ext_names = [ext["name"] for ext in extensions.values()]
+        print("\n- BPQX -")
+        print("[A]About [H]Help [B]Back [X]Exit")
         print(f"\nSelect Extension: {', '.join(ext_names)}")
         user_input = input("> ").strip()
         if not user_input:
