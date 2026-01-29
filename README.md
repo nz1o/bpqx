@@ -36,7 +36,7 @@ Select Extension: RPBOOK, OTHEREXT
 
 | Command | Action |
 |---|---|
-| `{extension name}` | Launch the named extension |
+| `{extension name}` | Launch the named extension (supports prefix matching — e.g., `RPB` launches `RPBOOK`; if multiple extensions match, options are listed) |
 | `H` or `Help` | Display application help text |
 | `A` or `About` | Display application about text |
 | `H {extension}` or `Help {extension}` | Display help for a specific extension |

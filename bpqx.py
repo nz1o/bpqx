@@ -358,7 +358,14 @@ def main():
         if ext:
             run_extension(ext)
         else:
-            print(f"Unknown extension: {user_input}")
+            matches = [k for k in extensions if k.startswith(lower)]
+            if len(matches) == 1:
+                run_extension(extensions[matches[0]])
+            elif len(matches) > 1:
+                names = ", ".join(extensions[k]["name"] for k in matches)
+                print(f"Options: {names}")
+            else:
+                print(f"\nSelect Extension: {', '.join(ext['name'] for ext in extensions.values())}")
 
 
 if __name__ == "__main__":
