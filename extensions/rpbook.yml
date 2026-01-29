@@ -47,7 +47,7 @@ program:  # Start of the extension's program
           menu:
             prompt: Select search type
             items:
-              - id: 1
+              - id: 2
                 key: L
                 text: LATLONG
                 help: Search by Lat/Long location
@@ -65,27 +65,69 @@ program:  # Start of the extension's program
                           type: string
                           required: true
                           name: _long
-                    - prompt: Radius
+                    - prompt: Mile Radius (default 25)
                       inputs:
                         - id: 1
                           type: string
-                          required: true
+                          required: false
                           name: _radius
-                  command: ''
+                    - prompt: Band (2m, 70cm, etc)
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: false
+                          name: _band
+                    - prompt: Mode (fm, fusion, etc.)
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: false
+                          name: _mode
+                    - prompt: Limit (default 50)
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: false
+                          name: _limit
+                  command: 'curl http://localhost:8011/api/nearbyastext?lat={_lat}&lng={_long}&radius_miles={_radius}&band={_band}&mode={_mode}&limit={_limit}'
                   help: Enter the lat/long, and any other search parameters.  Leave any param blank to match all.
-              - id: 2
+              - id: 1
                 key: G
                 text: GRID
                 help: Search by 4 char grid square
                 io:
                   prompts:
-                    - prompt: Grid
+                    - prompt: 4 Char Grid
                       inputs:
                         - id: 1
                           type: string
                           required: true
                           name: _grid
-                  command: ''
+                    - prompt: Mile Radius (default 25)
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: false
+                          name: _radius
+                    - prompt: Band (2m, 70cm, etc)
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: false
+                          name: _band
+                    - prompt: Mode (fm, fusion, etc.)
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: false
+                          name: _mode
+                    - prompt: Limit (default 50)
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: false
+                          name: _limit
+                  command: 'curl http://localhost:8011/api/nearbyastext?grid=FN43&&radius_miles={_radius}&band={_band}&mode={_mode}&limit={_limit}'
                   help: Enter the 4 char grid square, and any other search parameters.  Leave any param blank to match all.
         - id: 2
           key: V
