@@ -3,6 +3,7 @@
 import glob
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -19,6 +20,19 @@ RESERVED_TEXTS = {"about", "back", "help", "exit"}
 def load_appsettings():
     with open(APPSETTINGS_PATH, "r") as f:
         return yaml.safe_load(f)
+
+
+def parse_inline_param(s):
+    """Extract base and parameter name from strings like 'S {search}' -> ('s', 'search')."""
+    m = re.match(r'^(\S+)\s+\{(\w+)\}$', s)
+    if m:
+        return m.group(1).lower(), m.group(2)
+    return s.lower(), None
+
+
+def strip_inline_param(s):
+    """Remove '{param}' suffix from key/text for display."""
+    return re.sub(r'\s*\{\w+\}$', '', s)
 
 
 def validate_io(io_obj, filepath, path):
@@ -77,11 +91,28 @@ def validate_menu(menu, filepath, path="program.menu"):
         if "help" not in item:
             errors.append(f"{filepath}: {item_path}.help is required")
         key = item.get("key")
-        if key and key.lower() in RESERVED_KEYS:
+        key_base, key_param = parse_inline_param(key) if key else (None, None)
+        if key_base and key_base in RESERVED_KEYS:
             errors.append(f"{filepath}: {item_path}.key '{key}' is reserved")
         text = item.get("text")
-        if text and text.lower() in RESERVED_TEXTS:
+        _, text_param = parse_inline_param(text) if text else (None, None)
+        if text and strip_inline_param(text).lower() in RESERVED_TEXTS:
             errors.append(f"{filepath}: {item_path}.text '{text}' is reserved")
+        inline_param = key_param or text_param
+        if inline_param:
+            if "menu" in item:
+                errors.append(f"{filepath}: {item_path} inline parameter '{inline_param}' is only valid with 'io', not 'menu'")
+            if "io" in item:
+                io = item["io"]
+                if isinstance(io, list):
+                    io = io[0] if io else {}
+                all_inputs = []
+                for p in (io.get("prompts") or []):
+                    all_inputs.extend(p.get("inputs") or [])
+                if len(all_inputs) != 1:
+                    errors.append(f"{filepath}: {item_path} inline parameter requires exactly 1 input, found {len(all_inputs)}")
+                elif not any(inp.get("name") == inline_param for inp in all_inputs):
+                    errors.append(f"{filepath}: {item_path} inline parameter '{inline_param}' does not match input name '{all_inputs[0].get('name', '')}'")
         has_io = "io" in item
         has_menu = "menu" in item
         if has_io == has_menu:
@@ -132,30 +163,68 @@ def load_extensions():
 
 
 def find_item_by_input(items, user_input):
+    """Match user input to a menu item. Returns (item, inline_value) tuple."""
     user_lower = user_input.lower()
+    parts = user_input.split(None, 1)
+    base_lower = parts[0].lower() if parts else user_lower
+    inline_value = None
+    if len(parts) == 2:
+        try:
+            parsed = shlex.split(parts[1])
+            inline_value = parsed[0] if len(parsed) == 1 else parts[1]
+        except ValueError:
+            inline_value = parts[1]
+
     for item in items:
-        if item.get("key") and item["key"].lower() == user_lower:
-            return item
-        if item["text"].lower() == user_lower:
-            return item
-    return None
+        key = item.get("key", "")
+        text = item.get("text", "")
+        key_base, key_param = parse_inline_param(key) if key else (None, None)
+        text_base, text_param = parse_inline_param(text)
+
+        # Exact match on base key (with or without inline value)
+        if key_base and key_base == base_lower:
+            if key_param and inline_value:
+                return item, (key_param, inline_value)
+            if not inline_value:
+                return item, None
+
+        # Exact match on base text
+        if text_base == base_lower:
+            if text_param and inline_value:
+                return item, (text_param, inline_value)
+            if not inline_value:
+                return item, None
+
+        # Full exact match (no param pattern) - original behavior
+        if key and key.lower() == user_lower:
+            return item, None
+        if text.lower() == user_lower:
+            return item, None
+
+    return None, None
 
 
 def find_item_by_text(items, text):
     text_lower = text.lower()
     for item in items:
-        if item["text"].lower() == text_lower:
+        if strip_inline_param(item["text"]).lower() == text_lower:
             return item
     return None
 
 
-def run_io(io_obj):
+def run_io(io_obj, precollected=None):
     prompts = io_obj.get("prompts") or []
-    collected = {}
+    collected = dict(precollected) if precollected else {}
 
     for prompt_def in sorted(prompts, key=lambda p: p.get("id", 0)):
         inputs_def = prompt_def.get("inputs", []) or []
         inputs_sorted = sorted(inputs_def, key=lambda x: x["id"]) if inputs_def else []
+
+        if inputs_sorted and all(
+            (inp.get("name") and inp["name"] in collected) or str(inp["id"]) in collected
+            for inp in inputs_sorted
+        ):
+            continue
 
         while True:
             user_input = input(f"{prompt_def['prompt']}: ").strip()
@@ -167,7 +236,10 @@ def run_io(io_obj):
             if not inputs_sorted:
                 break
 
-            values = user_input.split() if user_input else []
+            try:
+                values = shlex.split(user_input) if user_input else []
+            except ValueError:
+                values = user_input.split() if user_input else []
             if len(values) != len(inputs_sorted):
                 if not values:
                     has_required = any(inp.get("required") for inp in inputs_sorted)
@@ -229,10 +301,18 @@ def display_menu(menu):
     items = sorted(menu["items"], key=lambda x: x["id"])
     parts = []
     for item in items:
-        if item.get("key"):
-            parts.append(f"[{item['key']}]{item['text']}")
+        raw_key = item.get("key", "")
+        raw_text = item.get("text", "")
+        key_base = strip_inline_param(raw_key) if raw_key else None
+        text_base = strip_inline_param(raw_text)
+        _, key_param = parse_inline_param(raw_key) if raw_key else (None, None)
+        _, text_param = parse_inline_param(raw_text)
+        param = key_param or text_param
+        suffix = f" ({param})" if param else ""
+        if key_base:
+            parts.append(f"[{key_base}]{text_base}{suffix}")
         else:
-            parts.append(item["text"])
+            parts.append(f"{text_base}{suffix}")
     print(f"\n{menu['prompt']}: {' '.join(parts)}")
 
 
@@ -294,7 +374,7 @@ def run_extension(ext):
                 print(f"Unknown item: {parts[1]}")
             continue
 
-        item = find_item_by_input(current_menu["items"], user_input)
+        item, inline = find_item_by_input(current_menu["items"], user_input)
         if not item:
             continue
 
@@ -304,7 +384,11 @@ def run_extension(ext):
             io_obj = item["io"]
             if isinstance(io_obj, list):
                 io_obj = io_obj[0]
-            run_io(io_obj)
+            precollected = None
+            if inline:
+                param_name, param_value = inline
+                precollected = {param_name: param_value}
+            run_io(io_obj, precollected=precollected)
 
 
 def main():

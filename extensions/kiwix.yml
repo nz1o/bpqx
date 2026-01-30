@@ -1,0 +1,152 @@
+# The following key/text combinations are reserved: A/About, B/Back, H/Help, X/Exit
+
+name: KIWIX  # Single word name of the BPQX extension that will be used to call the extension from BPQX
+description: 'Details' # Description of the extension
+about: >- # Main 'About' information for the extension.  This should describe the overall function/purpose of the extension
+  Details
+help: >- # Main 'Help' information for the extension that will be displayed when the user calls Help from the root of the extension
+  Details 
+program:  # Start of the extension's program
+    start_msg: ''  # Initial message that will be displayed to the user on startup 
+    # Menu items consist of a prompt that will be displayed to the user and a list of menu options available for the user to choose from
+    # Each menu must contain:
+    #     - prompt: string     # Prompt that will be displayed to the user when the menu is accessed
+    #     - One or more menu items with the following values:
+    #         - id: int        # Order in which the item will appear in the menu (Required)
+    #         - key: char      # Single key shortcut for the menu item.  Ex: "S".  Note, "A", "B", "H", and "X" are reserved (Optional)
+    #         - text: string   # Single word string for the menu item  Note, "About", "Back", "Help", and "Exit" are reserved (Required)
+    #         - help: string   # Help text for the specific menu item (Required)
+    #         - io: <or> menu: # Each menu item must have one of, but not both of, io: or menu:
+    #             menu: 
+    #               <sub menu in the same menu format>
+    #             io:                   
+    #               prompts:               # List of prompts to be displayed to the user (Required if inputs are specified)
+    #                 - prompt: string     # Prompt that will be displayed to the user to input data 
+    #                   inputs:            # List of inputs that are expected (Optional)
+    #                     - id: int        # Order the input will be entered, starting with 1 (Required if inputs are specified)
+    #                       type: string   # Type of input expected.  Ex: "string", "int", "bool" (Required if inputs are specified)
+    #                       required: bool # Is the input required?
+    #                       name: string   # Name of the input parameter (Optional)
+    #               help: string           # Help text for the specific menu item
+    #               command: string        # Command to be executed.  To pass input parameters use {id} or {name} placeholders.
+    #                                      # Ex: "ls -al {1}" or "wget -O {filename} {url}"
+    #
+    # Important!  Each branch of the menu tree must end with an "io" statement, resulting in a command being run
+
+    menu:
+      prompt: Select topic
+      items:
+        - id: 1
+          key: W
+          text: Wikipedia
+          help: Search Wikipedia
+          menu:
+            prompt: Action
+            items:
+              - id: 1
+                key: S {search}
+                text: Search {search}
+                help: Search Wikipedia with the provided string.  Use quotes for multi-word searches.
+                io:
+                  prompts:
+                    - prompt: Search for
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: search
+
+                  command: 'curl -s -G "http://localhost:5000/api/wikipedia/search" --data-urlencode "q={search}"'
+                  help: Enter the search term to search Wikipedia.  Use quotes for multi-word searches.
+              - id: 2
+                key: G {UID}
+                text: Get {UID}
+                help: Get search result or content by UID
+                io:
+                  prompts:
+                    - prompt: Get UID
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: UID
+
+                  command: 'curl -s -G "http://localhost:5000/api/wikipedia/get" --data-urlencode "uid={UID}"'
+                  help: Enter the UID of the content to retrieve
+        - id: 2
+          key: M
+          text: Medline
+          help: Search Medline
+          menu:
+            prompt: Action
+            items:
+              - id: 1
+                key: S {search}
+                text: Search {search}
+                help: Search Medline with the provided string.  Use quotes for multi-word searches.
+                io:
+                  prompts:
+                    - prompt: Search for
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: search
+
+                  command: 'curl -s -G "http://localhost:5000/api/medline/search" --data-urlencode "q={search}"'
+                  help: Enter the search term to search Medline.  Use quotes for multi-word searches.
+              - id: 2
+                key: G {UID}
+                text: Get {UID}
+                help: Get search result or content by UID
+                io:
+                  prompts:
+                    - prompt: Get UID
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: UID
+
+                  command: 'curl -s -G "http://localhost:5000/api/medline/get" --data-urlencode "uid={UID}"'
+                  help: Enter the UID of the content to retrieve
+        - id: 3
+          key: T
+          text: Hamtools
+          help: Search Hamtools
+          menu:
+            prompt: Action
+            items:
+              - id: 1
+                key: S {search}
+                text: Search {search}
+                help: Search Hamtools with the provided string.  Use quotes for multi-word searches.
+                io:
+                  prompts:
+                    - prompt: Search for
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: search
+
+                  command: 'curl -s -G "http://localhost:5000/api/hamtools/search" --data-urlencode "q={search}"'
+                  help: Enter the search term to search Hamtools.  Use quotes for multi-word searches.
+              - id: 2
+                key: G {UID}
+                text: Get {UID}
+                help: Get search result or content by UID
+                io:
+                  prompts:
+                    - prompt: Get UID
+                      inputs:
+                        - id: 1
+                          type: string
+                          required: true
+                          name: UID
+
+                  command: 'curl -s -G "http://localhost:5000/api/hamtools/get" --data-urlencode "uid={UID}"'
+                  help: Enter the UID of the content to retrieve
+            
+
+version: 0.1.0

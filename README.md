@@ -57,6 +57,7 @@ Items can be selected by typing the shortcut key (e.g., `C`) or the full text (e
 | Command | Action |
 |---|---|
 | `{key}` or `{text}` | Select a menu item |
+| `{key} {value}` or `{text} {value}` | Select a menu item and pass an inline input value (see [Inline Input Chaining](#inline-input-chaining)) |
 | `H` or `Help` | Display help for the current menu scope |
 | `A` or `About` | Display about for the current menu scope |
 | `H {item text}` or `Help {item text}` | Display help for a specific menu item |
@@ -77,7 +78,7 @@ Enter a call sign: W1AW
 | `H` or `Help` | Display help for this IO prompt |
 | Any other input | Validated against expected inputs, then used to execute the command |
 
-Input values are space-separated. The number and types of values must match the prompt's `inputs` definition. If an input has `required: true`, a blank response is rejected. If all inputs for a prompt are optional, a blank response is accepted. Command stdout is printed to the user. Command stderr is suppressed.
+Input values are space-separated. Quoted strings (e.g., `"fred baur"`) are treated as a single value. The number and types of values must match the prompt's `inputs` definition. If an input has `required: true`, a blank response is rejected. If all inputs for a prompt are optional, a blank response is accepted. Command stdout is printed to the user. Command stderr is suppressed.
 
 ## Application Settings
 
@@ -124,8 +125,8 @@ Each menu item must have exactly one of `io` or `menu` (not both).
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `id` | int | Yes | Sort order for display. |
-| `key` | char | No | Single-character shortcut key. Must not be a reserved key. |
-| `text` | string | Yes | Display text for the menu item. Must not be a reserved text. |
+| `key` | string | No | Shortcut key, optionally with an inline input parameter (e.g., `S` or `S {search}`). Must not be a reserved key. |
+| `text` | string | Yes | Display text for the menu item, optionally with an inline input parameter (e.g., `Search` or `Search {search}`). Must not be a reserved text. |
 | `help` | string | Yes | Help text for this menu item. |
 | `about` | string | No | About text for this menu item. |
 | `io` | object | No | IO block (terminal action). |
@@ -167,6 +168,37 @@ Commands can reference inputs by position or name:
 - `{1}`, `{2}`, etc. are replaced by the input value at that position.
 - `{_callsign}`, `{_frn}`, etc. are replaced by the input whose `name` matches.
 - If any `{...}` placeholders remain after substitution, an error is displayed.
+
+### Inline Input Chaining
+
+Menu items with an `io` block can support inline input chaining, allowing the user to provide an input value on the same line as the menu selection. This is enabled by appending `{param_name}` to the item's `key` and/or `text` fields.
+
+For example, with `key: S {search}` and `text: Search {search}`, the user can type `S antennas` to immediately execute the search without being prompted for input. Typing just `S` falls back to the normal prompt flow. Quoted strings are supported for multi-word values (e.g., `S "fred baur"`).
+
+The `{param_name}` suffix is stripped from the display, with the parameter name shown in parentheses: `[S]Search (search)`.
+
+**Constraints:**
+
+- The item must use `io`, not `menu`.
+- There must be exactly one input across all prompts in the `io` block.
+- The parameter name in `key`/`text` must match the `name` field of that input.
+- Both `key` and `text` should use the same parameter name if both specify one.
+
+```yaml
+- id: 1
+  key: S {search}
+  text: Search {search}
+  help: Search Wikipedia
+  io:
+    prompts:
+      - prompt: Search for
+        inputs:
+          - id: 1
+            type: string
+            required: true
+            name: search
+    command: 'curl -s -G "http://localhost:5000/api/wikipedia/search" --data-urlencode "q={search}"'
+```
 
 ### Example Extension
 
